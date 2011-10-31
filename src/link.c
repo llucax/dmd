@@ -196,6 +196,11 @@ int runLINK()
         cmdbuf.writestring((*global.params.linkswitches)[i]);
     }
     cmdbuf.writeByte(';');
+    for (size_t i = 0; i < global.params.linkpostswitches->dim; i++)
+    {
+        cmdbuf.writestring(global.params.linkpostswitches->tdata()[i]);
+    }
+    cmdbuf.writeByte(';');
 
     p = cmdbuf.toChars();
 
@@ -345,6 +350,15 @@ int runLINK()
         argv.push(p);
     }
 
+    for (size_t i = 0; i < global.params.linkpostswitches->dim; i++)
+    {   char *p = global.params.linkpostswitches->tdata()[i];
+        if (!p || !p[0] || !(p[0] == '-' && (p[1] == 'l' || p[1] == 'L')))
+            // Don't need -Xlinker if switch starts with -l or -L.
+            // Eliding -Xlinker is significant for -L since it allows our paths
+            // to take precedence over gcc defaults.
+            argv.push((char *)"-Xlinker");
+    }
+
     /* Add each library, prefixing it with "-l".
      * The order of libraries passed is:
      *  1. any libraries passed with -L command line switch
@@ -352,6 +366,7 @@ int runLINK()
      *  3. libraries specified by pragma(lib), which were appended
      *     to global.params.libfiles.
      *  4. standard libraries.
+     *  5. any libraries passed with -sL command line switch
      */
     for (size_t i = 0; i < global.params.libfiles->dim; i++)
     {   char *p = (*global.params.libfiles)[i];
@@ -390,6 +405,10 @@ int runLINK()
     // Changes in ld for Ubuntu 11.10 require this to appear after phobos2
     argv.push((char *)"-lrt");
 #endif
+
+    /* Some switched (libraries) needs to be passed after the standard libs */
+    for (size_t i = 0; i < global.params.linkpostswitches->dim; i++)
+        argv.push(global.params.linkpostswitches->tdata()[i]);
 
     if (!global.params.quiet || global.params.verbose)
     {
