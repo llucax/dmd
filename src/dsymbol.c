@@ -215,10 +215,8 @@ const char *Dsymbol::toPrettyChars()
     return s;
 }
 
-char *Dsymbol::locToChars()
+Loc& Dsymbol::getLoc()
 {
-    OutBuffer buf;
-
     if (!loc.filename)  // avoid bug 5861.
     {
         Module *m = getModule();
@@ -226,7 +224,12 @@ char *Dsymbol::locToChars()
         if (m && m->srcfile)
             loc.filename = m->srcfile->toChars();
     }
-    return loc.toChars();
+    return loc;
+}
+
+char *Dsymbol::locToChars()
+{
+    return getLoc().toChars();
 }
 
 const char *Dsymbol::kind()
@@ -597,17 +600,9 @@ int Dsymbol::addMember(Scope *sc, ScopeDsymbol *sd, int memnum)
 
 void Dsymbol::error(const char *format, ...)
 {
-    //printf("Dsymbol::error()\n");
-    if (!loc.filename)  // avoid bug 5861.
-    {
-        Module *m = getModule();
-
-        if (m && m->srcfile)
-            loc.filename = m->srcfile->toChars();
-    }
     va_list ap;
     va_start(ap, format);
-    verror(loc, format, ap, kind(), toPrettyChars());
+    ::verror(getLoc(), format, ap, kind(), toPrettyChars());
     va_end(ap);
 }
 
@@ -615,7 +610,23 @@ void Dsymbol::error(Loc loc, const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    verror(loc, format, ap, kind(), toPrettyChars());
+    ::verror(loc, format, ap, kind(), toPrettyChars());
+    va_end(ap);
+}
+
+void Dsymbol::deprecation(Loc loc, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    ::vdeprecation(loc, format, ap, kind(), toPrettyChars());
+    va_end(ap);
+}
+
+void Dsymbol::deprecation(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    ::vdeprecation(getLoc(), format, ap, kind(), toPrettyChars());
     va_end(ap);
 }
 
@@ -639,7 +650,7 @@ void Dsymbol::checkDeprecated(Loc loc, Scope *sc)
                 goto L1;
         }
 
-        error(loc, "is deprecated");
+        deprecation(loc, "is deprecated");
     }
 
   L1:
@@ -1223,8 +1234,8 @@ Dsymbol *ArrayScopeSymbol::search(Loc loc, Identifier *ident, int flags)
     {   VarDeclaration **pvar;
         Expression *ce;
 
-        if (ident == Id::length && !global.params.useDeprecated)
-            error("using 'length' inside [ ] is deprecated, use '$' instead");
+        if (ident == Id::length)
+            deprecation("using 'length' inside [ ] is deprecated, use '$' instead");
 
     L1:
 
